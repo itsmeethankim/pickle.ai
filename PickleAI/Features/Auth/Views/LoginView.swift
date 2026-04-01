@@ -110,48 +110,6 @@ struct LoginView: View {
     }
 }
 
-// MARK: - Design Tokens
-
-extension Color {
-    static let appGreen = Color(red: 0.18, green: 0.72, blue: 0.32)
-}
-
-// MARK: - Custom Styles
-
-struct AppRoundedTextFieldStyle: TextFieldStyle {
-    func _body(configuration: TextField<Self._Label>) -> some View {
-        configuration
-            .padding(.horizontal, 16)
-            .padding(.vertical, 14)
-            .background(Color(.secondarySystemBackground))
-            .clipShape(RoundedRectangle(cornerRadius: 12))
-            .overlay(
-                RoundedRectangle(cornerRadius: 12)
-                    .stroke(Color(.separator), lineWidth: 0.5)
-            )
-    }
-}
-
-extension TextFieldStyle where Self == AppRoundedTextFieldStyle {
-    static var appRounded: AppRoundedTextFieldStyle { .init() }
-}
-
-struct AppPrimaryButtonStyle: ButtonStyle {
-    @Environment(\.isEnabled) private var isEnabled
-
-    func makeBody(configuration: Configuration) -> some View {
-        configuration.label
-            .foregroundStyle(.white)
-            .background(
-                RoundedRectangle(cornerRadius: 12)
-                    .fill(Color.green.opacity(isEnabled ? (configuration.isPressed ? 0.8 : 1) : 0.4))
-            )
-    }
-}
-
-extension ButtonStyle where Self == AppPrimaryButtonStyle {
-    static var appPrimary: AppPrimaryButtonStyle { .init() }
-}
 
 #Preview {
     LoginView()

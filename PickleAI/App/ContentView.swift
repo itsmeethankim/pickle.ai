@@ -4,11 +4,17 @@ import FirebaseFirestore
 
 struct ContentView: View {
     @EnvironmentObject var authViewModel: AuthViewModel
+    @AppStorage("hasCompletedOnboarding") private var hasCompletedOnboarding = false
 
     var body: some View {
         Group {
             if authViewModel.isAuthenticated {
                 MainTabView()
+                    .fullScreenCover(isPresented: .constant(!hasCompletedOnboarding)) {
+                        OnboardingView {
+                            hasCompletedOnboarding = true
+                        }
+                    }
             } else {
                 LoginView()
             }
@@ -51,10 +57,17 @@ struct MainTabView: View {
     }
 }
 
+enum AnalysisMode: String, CaseIterable {
+    case quickShot = "Quick Shot"
+    case fullMatch = "Full Match"
+}
+
 struct RecordTab: View {
     @StateObject private var captureVM = CaptureViewModel()
     @StateObject private var analysisVM = AnalysisViewModel()
+    @StateObject private var matchAnalysisVM = MatchAnalysisViewModel()
     @EnvironmentObject var authViewModel: AuthViewModel
+    @State private var analysisMode: AnalysisMode = .quickShot
     @State private var analysisStartTime = Date()
     @State private var selectedShotType: ShotType?
     @State private var isShowingShotPicker = false
@@ -66,24 +79,38 @@ struct RecordTab: View {
             VStack(spacing: 24) {
                 Spacer()
 
-                Image(systemName: "figure.pickleball")
+                Image(systemName: analysisMode == .quickShot ? "figure.pickleball" : "video.fill")
                     .font(.system(size: 80))
                     .foregroundStyle(.green)
 
-                Text("Analyze Your Swing")
+                Text(analysisMode == .quickShot ? "Analyze Your Swing" : "Analyze Full Match")
                     .font(.title2.bold())
 
-                Text("Record a video or choose from your library to get AI coaching feedback.")
+                Text(analysisMode == .quickShot
+                     ? "Record a video or choose from your library to get AI coaching feedback."
+                     : "Record or choose a full match video to get rally-by-rally analysis and coaching insights.")
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
                     .multilineTextAlignment(.center)
                     .padding(.horizontal, 32)
 
+                Picker("Mode", selection: $analysisMode) {
+                    ForEach(AnalysisMode.allCases, id: \.self) { mode in
+                        Text(mode.rawValue).tag(mode)
+                    }
+                }
+                .pickerStyle(.segmented)
+                .padding(.horizontal, 32)
+
                 VStack(spacing: 12) {
                     if UIImagePickerController.isSourceTypeAvailable(.camera) {
                         Button {
                             pendingCameraCapture = true
-                            isShowingShotPicker = true
+                            if analysisMode == .quickShot {
+                                isShowingShotPicker = true
+                            } else {
+                                captureVM.isShowingCamera = true
+                            }
                         } label: {
                             Label("Record Video", systemImage: "camera.fill")
                                 .frame(maxWidth: .infinity)
@@ -94,7 +121,11 @@ struct RecordTab: View {
 
                     Button {
                         pendingCameraCapture = false
-                        isShowingShotPicker = true
+                        if analysisMode == .quickShot {
+                            isShowingShotPicker = true
+                        } else {
+                            captureVM.isShowingPicker = true
+                        }
                     } label: {
                         Label("Choose from Library", systemImage: "photo.on.rectangle")
                             .frame(maxWidth: .infinity)
@@ -169,10 +200,12 @@ struct RecordTab: View {
     private var showingAnalysis: Binding<Bool> {
         Binding(
             get: {
-                switch analysisVM.analysisState {
-                case .idle: return false
-                default: return true
+                if analysisMode == .fullMatch {
+                    if case .idle = matchAnalysisVM.analysisState { return false }
+                    return true
                 }
+                if case .idle = analysisVM.analysisState { return false }
+                return true
             },
             set: { _ in }
         )
@@ -187,6 +220,15 @@ struct RecordTab: View {
 
     @ViewBuilder
     private var analysisOverlay: some View {
+        if analysisMode == .fullMatch {
+            matchAnalysisOverlay
+        } else {
+            quickShotOverlay
+        }
+    }
+
+    @ViewBuilder
+    private var quickShotOverlay: some View {
         switch analysisVM.analysisState {
         case .idle:
             EmptyView()
@@ -223,12 +265,56 @@ struct RecordTab: View {
         }
     }
 
+    @ViewBuilder
+    private var matchAnalysisOverlay: some View {
+        switch matchAnalysisVM.analysisState {
+        case .idle:
+            EmptyView()
+        case .extractingFrames, .uploading, .analyzing:
+            AnalysisLoadingView(startTime: analysisStartTime)
+        case .completed(let matchAnalysis):
+            NavigationStack {
+                MatchReportView(analysis: matchAnalysis)
+                    .toolbar {
+                        ToolbarItem(placement: .topBarLeading) {
+                            Button("Done") {
+                                matchAnalysisVM.analysisState = .idle
+                            }
+                        }
+                    }
+            }
+        case .failed(let error):
+            VStack(spacing: 16) {
+                Image(systemName: "exclamationmark.triangle.fill")
+                    .font(.system(size: 48))
+                    .foregroundStyle(.red)
+                Text("Match Analysis Failed")
+                    .font(.title2.bold())
+                Text(error.localizedDescription)
+                    .foregroundStyle(.secondary)
+                    .multilineTextAlignment(.center)
+                    .padding(.horizontal)
+                Button("Try Again") {
+                    matchAnalysisVM.analysisState = .idle
+                }
+                .buttonStyle(.borderedProminent)
+                .tint(.green)
+            }
+        }
+    }
+
     private func startAnalysis() {
         guard let url = captureVM.selectedVideoURL,
               let userId = authViewModel.currentUser?.uid else { return }
         analysisStartTime = Date()
-        Task {
-            await analysisVM.analyzeVideo(url: url, userId: userId, shotType: selectedShotType)
+        if analysisMode == .fullMatch {
+            Task {
+                await matchAnalysisVM.analyzeMatch(url: url, userId: userId)
+            }
+        } else {
+            Task {
+                await analysisVM.analyzeVideo(url: url, userId: userId, shotType: selectedShotType)
+            }
         }
     }
 }
@@ -247,72 +333,12 @@ struct PracticeTab: View {
 
 struct HistoryTab: View {
     var body: some View {
-        NavigationStack {
-            HistoryListView()
-        }
+        HistoryListView()
     }
 }
 
 struct ProfileTab: View {
-    @EnvironmentObject var authViewModel: AuthViewModel
-    @State private var skillLevel: Double = 3.0
-
     var body: some View {
-        NavigationStack {
-            List {
-                Section {
-                    HStack {
-                        Image(systemName: "person.circle.fill")
-                            .font(.system(size: 48))
-                            .foregroundStyle(.green)
-                        VStack(alignment: .leading) {
-                            Text(authViewModel.currentUser?.displayName ?? "Player")
-                                .font(.headline)
-                            Text(authViewModel.currentUser?.email ?? "")
-                                .font(.subheadline)
-                                .foregroundStyle(.secondary)
-                        }
-                    }
-                    .padding(.vertical, 4)
-                }
-
-                Section("Skill Level") {
-                    HStack {
-                        Slider(value: $skillLevel, in: 2.0...5.0, step: 0.5)
-                            .tint(.green)
-                            .onChange(of: skillLevel) { _, newValue in
-                                saveSkillLevel(newValue)
-                            }
-                        Text(skillLevel, format: .number.precision(.fractionLength(1)))
-                            .font(.subheadline.bold())
-                            .foregroundStyle(.green)
-                            .frame(width: 36, alignment: .trailing)
-                    }
-                }
-
-                Section {
-                    Button("Sign Out", role: .destructive) {
-                        authViewModel.signOut()
-                    }
-                }
-            }
-            .navigationTitle("Profile")
-            .onAppear { loadSkillLevel() }
-        }
-    }
-
-    private func saveSkillLevel(_ value: Double) {
-        guard let userId = authViewModel.currentUser?.uid else { return }
-        Firestore.firestore().collection("users").document(userId)
-            .setData(["skillLevel": value], merge: true)
-    }
-
-    private func loadSkillLevel() {
-        guard let userId = authViewModel.currentUser?.uid else { return }
-        Firestore.firestore().collection("users").document(userId).getDocument { snapshot, _ in
-            if let value = snapshot?.data()?["skillLevel"] as? Double {
-                skillLevel = value
-            }
-        }
+        ProfileView()
     }
 }

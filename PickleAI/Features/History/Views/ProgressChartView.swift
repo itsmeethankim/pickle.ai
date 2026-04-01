@@ -78,16 +78,16 @@ struct ProgressChartView: View {
                     x: .value("Date", point.date),
                     y: .value("Score", point.score)
                 )
-                .foregroundStyle(.blue)
+                .foregroundStyle(.green)
                 PointMark(
                     x: .value("Date", point.date),
                     y: .value("Score", point.score)
                 )
-                .foregroundStyle(.blue)
+                .foregroundStyle(.green)
             }
-            .chartYScale(domain: 1...10)
+            .chartYScale(domain: 0...100)
             .chartYAxis {
-                AxisMarks(values: [1, 3, 5, 7, 10])
+                AxisMarks(values: [0, 25, 50, 75, 100])
             }
             .frame(height: 200)
             .padding(.horizontal)
@@ -127,9 +127,9 @@ struct ProgressChartView: View {
                 )
                 .foregroundStyle(.orange)
             }
-            .chartYScale(domain: 1...10)
+            .chartYScale(domain: 0...100)
             .chartYAxis {
-                AxisMarks(values: [1, 3, 5, 7, 10])
+                AxisMarks(values: [0, 25, 50, 75, 100])
             }
             .frame(height: 200)
             .padding(.horizontal)

@@ -26,14 +26,16 @@ final class PracticeViewModel: ObservableObject {
         }
     }
 
-    func generatePlan(userId: String) async {
+    func generatePlan(userId: String, availableMinutes: Int = 45, goals: String = "General Improvement") async {
         isGenerating = true
         defer { isGenerating = false }
         do {
             let plan = try await PracticePlanService.shared.generatePlan(
                 userId: userId,
                 skillLevel: skillLevel,
-                focusAreas: Array(selectedFocusAreas)
+                focusAreas: Array(selectedFocusAreas),
+                availableMinutes: availableMinutes,
+                goals: goals
             )
             currentPlan = plan
         } catch {

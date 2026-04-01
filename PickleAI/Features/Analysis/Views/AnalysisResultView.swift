@@ -87,17 +87,17 @@ private struct OverallScoreView: View {
 
     private var color: Color {
         switch score {
-        case 8...10: return .green
-        case 5...7:  return .yellow
-        default:     return .red
+        case 80...100: return .green
+        case 50...79:  return .yellow
+        default:       return .red
         }
     }
 
     private var label: String {
         switch score {
-        case 8...10: return "Excellent"
-        case 5...7:  return "Good"
-        default:     return "Needs Work"
+        case 80...100: return "Excellent"
+        case 50...79:  return "Good"
+        default:       return "Needs Work"
         }
     }
 
@@ -111,15 +111,15 @@ private struct OverallScoreView: View {
                 Circle()
                     .stroke(color.opacity(0.15), lineWidth: 12)
                 Circle()
-                    .trim(from: 0, to: CGFloat(score) / 10.0)
+                    .trim(from: 0, to: CGFloat(score) / 100.0)
                     .stroke(color, style: StrokeStyle(lineWidth: 12, lineCap: .round))
                     .rotationEffect(.degrees(-90))
                     .animation(.easeOut(duration: 1.2), value: score)
                 VStack(spacing: 2) {
                     Text("\(score)")
-                        .font(.system(size: 52, weight: .bold, design: .rounded))
+                        .font(.system(size: 44, weight: .bold, design: .rounded))
                         .foregroundStyle(color)
-                    Text("/ 10")
+                    Text("/ 100")
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }
@@ -147,9 +147,9 @@ private struct CategoryCardView: View {
 
     private var color: Color {
         switch feedback.score {
-        case 8...10: return .green
-        case 5...7:  return .yellow
-        default:     return .red
+        case 80...100: return .green
+        case 50...79:  return .yellow
+        default:       return .red
         }
     }
 
@@ -159,12 +159,12 @@ private struct CategoryCardView: View {
                 Text(name)
                     .font(.headline)
                 Spacer()
-                Text("\(feedback.score)/10")
+                Text("\(feedback.score)/100")
                     .font(.subheadline.bold())
                     .foregroundStyle(color)
             }
 
-            ProgressView(value: Double(feedback.score), total: 10)
+            ProgressView(value: Double(feedback.score), total: 100)
                 .progressViewStyle(.linear)
                 .tint(color)
 

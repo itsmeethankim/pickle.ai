@@ -9,6 +9,9 @@ struct AppUser: Codable, Identifiable {
     var analysisCount: Int
     var dailyAnalysisCount: Int
     var lastAnalysisDate: Date?
+    var xp: Int = 0
+    var currentStreak: Int = 0
+    var level: Int = 1
 
     static func new(email: String, displayName: String) -> AppUser {
         AppUser(
@@ -17,7 +20,10 @@ struct AppUser: Codable, Identifiable {
             createdAt: Date(),
             analysisCount: 0,
             dailyAnalysisCount: 0,
-            lastAnalysisDate: nil
+            lastAnalysisDate: nil,
+            xp: 0,
+            currentStreak: 0,
+            level: 1
         )
     }
 }

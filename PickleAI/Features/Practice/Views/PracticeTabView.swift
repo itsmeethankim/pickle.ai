@@ -1,4 +1,5 @@
 import SwiftUI
+import SafariServices
 
 struct PracticeTabView: View {
     @StateObject private var practiceVM = PracticeViewModel()
@@ -10,8 +11,8 @@ struct PracticeTabView: View {
             Group {
                 if let plan = practiceVM.currentPlan {
                     planView(plan: plan)
-                } else if practiceVM.isLoading {
-                    ProgressView("Loading your plan…")
+                } else if practiceVM.isLoading || practiceVM.isGenerating {
+                    ProgressView(practiceVM.isGenerating ? "Generating your plan…" : "Loading your plan…")
                 } else {
                     emptyStateView
                 }
@@ -23,7 +24,9 @@ struct PracticeTabView: View {
                 }
             }
             .sheet(isPresented: $isShowingGeneratePlan) {
-                GeneratePlanView(practiceVM: practiceVM)
+                if let userId = authViewModel.currentUser?.uid {
+                    PracticeSurveyView(practiceVM: practiceVM, userId: userId)
+                }
             }
         }
     }
@@ -94,7 +97,10 @@ struct PracticeTabView: View {
                     let day = plan.days[practiceVM.selectedDayIndex]
                     VStack(spacing: 12) {
                         ForEach(day.drills) { drill in
-                            DrillCard(drill: drill)
+                            NavigationLink(destination: DrillDetailView(drill: drill)) {
+                                DrillCard(drill: drill)
+                            }
+                            .buttonStyle(.plain)
                         }
                     }
                     .padding(.horizontal)
@@ -118,13 +124,25 @@ struct PracticeTabView: View {
 
 struct DrillCard: View {
     let drill: Drill
+    @State private var isCompleted = false
+    @State private var showingVideo = false
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
             HStack {
                 Text(drill.name)
                     .font(.headline)
+                    .strikethrough(isCompleted, color: .secondary)
+                    .foregroundStyle(isCompleted ? .secondary : .primary)
                 Spacer()
+                Button {
+                    isCompleted.toggle()
+                } label: {
+                    Image(systemName: isCompleted ? "checkmark.circle.fill" : "circle")
+                        .font(.title3)
+                        .foregroundStyle(isCompleted ? .green : Color(.systemGray3))
+                }
+                .buttonStyle(.plain)
             }
 
             Text(drill.description)
@@ -158,6 +176,29 @@ struct DrillCard: View {
                         .background(Color.orange.opacity(0.15))
                         .foregroundStyle(.orange)
                         .clipShape(Capsule())
+                }
+
+                Spacer()
+
+                if let videoUrl = drill.videoUrl, !videoUrl.isEmpty {
+                    Button {
+                        showingVideo = true
+                    } label: {
+                        Label("Watch Demo", systemImage: "play.circle.fill")
+                            .font(.caption.bold())
+                            .padding(.horizontal, 8)
+                            .padding(.vertical, 4)
+                            .background(Color.green.opacity(0.15))
+                            .foregroundStyle(.green)
+                            .clipShape(Capsule())
+                    }
+                    .buttonStyle(.plain)
+                    .sheet(isPresented: $showingVideo) {
+                        if let url = URL(string: videoUrl) {
+                            SafariView(url: url)
+                                .ignoresSafeArea()
+                        }
+                    }
                 }
             }
         }

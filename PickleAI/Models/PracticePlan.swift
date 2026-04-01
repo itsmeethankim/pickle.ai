@@ -8,18 +8,27 @@ struct Drill: Codable, Identifiable {
     var durationMinutes: Int
     var shotType: String?
     var reps: Int?
+    var videoUrl: String?
+    var videoTitle: String?
+    var commonMistakes: [String]?
+    var progressionTips: [String]?
 
-    init(id: UUID = UUID(), name: String, description: String, durationMinutes: Int, shotType: String? = nil, reps: Int? = nil) {
+    init(id: UUID = UUID(), name: String, description: String, durationMinutes: Int, shotType: String? = nil, reps: Int? = nil, videoUrl: String? = nil, videoTitle: String? = nil, commonMistakes: [String]? = nil, progressionTips: [String]? = nil) {
         self.id = id
         self.name = name
         self.description = description
         self.durationMinutes = durationMinutes
         self.shotType = shotType
         self.reps = reps
+        self.videoUrl = videoUrl
+        self.videoTitle = videoTitle
+        self.commonMistakes = commonMistakes
+        self.progressionTips = progressionTips
     }
 
     enum CodingKeys: String, CodingKey {
         case name, description, durationMinutes, shotType, reps
+        case videoUrl, videoTitle, commonMistakes, progressionTips
     }
 
     init(from decoder: Decoder) throws {
@@ -30,6 +39,10 @@ struct Drill: Codable, Identifiable {
         self.durationMinutes = try container.decode(Int.self, forKey: .durationMinutes)
         self.shotType = try container.decodeIfPresent(String.self, forKey: .shotType)
         self.reps = try container.decodeIfPresent(Int.self, forKey: .reps)
+        self.videoUrl = try container.decodeIfPresent(String.self, forKey: .videoUrl)
+        self.videoTitle = try container.decodeIfPresent(String.self, forKey: .videoTitle)
+        self.commonMistakes = try container.decodeIfPresent([String].self, forKey: .commonMistakes)
+        self.progressionTips = try container.decodeIfPresent([String].self, forKey: .progressionTips)
     }
 }
 

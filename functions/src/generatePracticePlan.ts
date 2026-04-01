@@ -11,6 +11,8 @@ interface GeneratePracticePlanRequest {
   userId: string;
   skillLevel: number;
   focusAreas: string[];
+  availableMinutes?: number;
+  goals?: string;
 }
 
 interface DrillSchema {
@@ -19,6 +21,10 @@ interface DrillSchema {
   durationMinutes: number;
   shotType: string;
   reps: number;
+  videoUrl: string;
+  videoTitle: string;
+  commonMistakes: string[];
+  progressionTips: string[];
 }
 
 interface PracticeDaySchema {
@@ -52,8 +58,12 @@ const practicePlanSchema = {
                 durationMinutes: { type: "number" },
                 shotType: { type: "string" },
                 reps: { type: "number" },
+                videoUrl: { type: "string" },
+                videoTitle: { type: "string" },
+                commonMistakes: { type: "array", items: { type: "string" } },
+                progressionTips: { type: "array", items: { type: "string" } },
               },
-              required: ["name", "description", "durationMinutes", "shotType", "reps"],
+              required: ["name", "description", "durationMinutes", "shotType", "reps", "videoUrl", "videoTitle", "commonMistakes", "progressionTips"],
               additionalProperties: false,
             },
           },
@@ -73,7 +83,7 @@ export const generatePracticePlan = functions.onCall(
   async (request) => {
     const db = admin.firestore();
     const data = request.data as GeneratePracticePlanRequest;
-    const { userId, skillLevel, focusAreas } = data;
+    const { userId, skillLevel, focusAreas, availableMinutes, goals } = data;
 
     // Validate inputs
     if (!userId) {
@@ -95,14 +105,15 @@ export const generatePracticePlan = functions.onCall(
       .limit(10)
       .get();
 
-    // Extract weak areas (score < 60)
+    // Extract weak areas (score < 60) — dynamically read all category keys
+    const reservedKeys = new Set(["isPickleball", "overallScore", "generalTips"]);
     const weakAreas: string[] = [];
     for (const doc of analysesSnapshot.docs) {
       const analysisData = doc.data();
       const feedback = analysisData.feedback;
       if (!feedback) continue;
-      const categories = ["grip", "stance", "swingPath", "followThrough", "footwork"];
-      for (const category of categories) {
+      for (const category of Object.keys(feedback)) {
+        if (reservedKeys.has(category)) continue;
         const categoryData = feedback[category];
         if (categoryData && typeof categoryData.score === "number" && categoryData.score < 60) {
           if (!weakAreas.includes(category)) {
@@ -117,11 +128,18 @@ export const generatePracticePlan = functions.onCall(
       : "no specific weak areas identified";
 
     const sport = "pickleball";
+    const sessionMinutes = availableMinutes ?? 45;
+    const goalsText = goals ?? "General Improvement";
+    const videoBaseUrl = "https://www.youtube.com/results?search_query=" + sport + "+";
     const prompt =
       `Create a 5-day practice plan for a ${skillLevel}-rated ${sport} player. ` +
+      `Player goals: ${goalsText}. ` +
       `Focus areas: ${focusAreas.join(", ")}. ` +
       `Based on recent analysis, weak areas include: ${weakAreasText}. ` +
-      `Each day should have 3-4 drills.`;
+      `Each practice session should be approximately ${sessionMinutes} minutes total. ` +
+      `Each day should have 3-4 drills. ` +
+      `For each drill, set videoUrl to "${videoBaseUrl}<drill-name-url-encoded>", provide a descriptive videoTitle, ` +
+      `2-3 common mistakes players make, and 2-3 progression tips to advance the skill.`;
 
     let planData: PracticePlanSchema;
     try {
@@ -133,7 +151,7 @@ export const generatePracticePlan = functions.onCall(
             role: "system",
             content:
               `You are an expert ${sport} coach. Create detailed, actionable practice plans. ` +
-              "Each drill should have a clear name, description, duration in minutes, a shot type (e.g. 'Dink', 'Drive', 'Drop', 'Serve', 'Volley', or 'General'), and rep count.",
+              "Each drill should have a clear name, description, duration in minutes, a shot type (e.g. 'Dink', 'Drive', 'Drop', 'Serve', 'Volley', or 'General'), rep count, a YouTube search URL for a demo video, a video title, 2-3 common mistakes, and 2-3 progression tips.",
           },
           {
             role: "user",
@@ -148,7 +166,7 @@ export const generatePracticePlan = functions.onCall(
             schema: practicePlanSchema,
           },
         },
-        max_tokens: 2000,
+        max_tokens: 4000,
       });
 
       const content = response.choices[0]?.message?.content;

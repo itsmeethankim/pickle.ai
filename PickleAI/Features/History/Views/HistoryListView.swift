@@ -58,32 +58,122 @@ struct HistoryListView: View {
         }
     }
 
+    private var timeRangePicker: some View {
+        HStack(spacing: 8) {
+            ForEach(TimeRange.allCases, id: \.self) { range in
+                Button(range.rawValue) {
+                    viewModel.selectedTimeRange = range
+                }
+                .font(.subheadline.bold())
+                .padding(.horizontal, 14)
+                .padding(.vertical, 6)
+                .background(
+                    viewModel.selectedTimeRange == range
+                        ? Color.green
+                        : Color.secondary.opacity(0.15),
+                    in: Capsule()
+                )
+                .foregroundStyle(
+                    viewModel.selectedTimeRange == range ? .white : .primary
+                )
+            }
+            Spacer()
+        }
+        .padding(.horizontal)
+        .padding(.top, 4)
+    }
+
+    private var shotTypeFilter: some View {
+        ScrollView(.horizontal, showsIndicators: false) {
+            HStack(spacing: 8) {
+                Button("All") {
+                    viewModel.selectedShotType = nil
+                }
+                .font(.subheadline)
+                .padding(.horizontal, 12)
+                .padding(.vertical, 6)
+                .background(
+                    viewModel.selectedShotType == nil
+                        ? Color.green
+                        : Color.secondary.opacity(0.15),
+                    in: Capsule()
+                )
+                .foregroundStyle(viewModel.selectedShotType == nil ? .white : .primary)
+
+                ForEach(ShotType.allCases, id: \.self) { shot in
+                    Button(shot.displayName) {
+                        viewModel.selectedShotType = viewModel.selectedShotType == shot ? nil : shot
+                    }
+                    .font(.subheadline)
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 6)
+                    .background(
+                        viewModel.selectedShotType == shot
+                            ? Color.green
+                            : Color.secondary.opacity(0.15),
+                        in: Capsule()
+                    )
+                    .foregroundStyle(viewModel.selectedShotType == shot ? .white : .primary)
+                }
+            }
+            .padding(.horizontal)
+        }
+    }
+
     private var analysesList: some View {
         List {
+            // Summary + filters
             Section {
                 summaryHeader
+                timeRangePicker
+                shotTypeFilter
+                    .listRowInsets(EdgeInsets(top: 0, leading: 0, bottom: 8, trailing: 0))
             }
             .listRowInsets(EdgeInsets())
             .listRowBackground(Color.clear)
+            .listRowSeparator(.hidden)
 
-            ForEach(viewModel.analyses) { analysis in
-                NavigationLink(destination: Text("Analysis Detail")) {
-                    AnalysisRowView(analysis: analysis)
+            // Progress chart
+            if viewModel.filteredAnalyses.count >= 2 {
+                Section {
+                    ProgressChartView(analyses: viewModel.filteredAnalyses)
                 }
-                .task {
-                    if analysis.id == viewModel.analyses.last?.id && viewModel.hasMore {
-                        await viewModel.loadMore()
-                    }
-                }
+                .listRowInsets(EdgeInsets())
+                .listRowBackground(Color.clear)
+                .listRowSeparator(.hidden)
             }
 
-            if viewModel.isLoading {
-                HStack {
-                    Spacer()
-                    ProgressView()
-                    Spacer()
+            // Insights
+            if viewModel.filteredAnalyses.count >= 2 {
+                Section {
+                    InsightsView(analyses: viewModel.filteredAnalyses)
                 }
+                .listRowInsets(EdgeInsets())
                 .listRowBackground(Color.clear)
+                .listRowSeparator(.hidden)
+            }
+
+            // Analysis list
+            Section("Sessions") {
+                ForEach(viewModel.filteredAnalyses) { analysis in
+                    NavigationLink(destination: AnalysisResultView(analysis: analysis)) {
+                        AnalysisRowView(analysis: analysis)
+                    }
+                    .task {
+                        if analysis.id == viewModel.analyses.last?.id && viewModel.hasMore {
+                            await viewModel.loadMore()
+                        }
+                    }
+                }
+
+                if viewModel.isLoading {
+                    HStack {
+                        Spacer()
+                        ProgressView()
+                        Spacer()
+                    }
+                    .listRowBackground(Color.clear)
+                }
             }
         }
         .listStyle(.plain)
@@ -103,6 +193,11 @@ struct AnalysisRowView: View {
                 Text(analysis.createdAt.shortFormatted())
                     .font(.caption)
                     .foregroundStyle(.secondary)
+                if let shotType = analysis.shotType {
+                    Text(shotType.displayName)
+                        .font(.caption2)
+                        .foregroundStyle(.green)
+                }
             }
             Spacer()
             if let score = analysis.overallScore {
@@ -136,9 +231,9 @@ struct AnalysisRowView: View {
 
     private func scoreColor(_ score: Int) -> Color {
         switch score {
-        case 8...10: return .green
-        case 5...7:  return .yellow
-        default:     return .red
+        case 80...100: return .green
+        case 50...79:  return .yellow
+        default:       return .red
         }
     }
 

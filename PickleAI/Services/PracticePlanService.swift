@@ -9,13 +9,15 @@ class PracticePlanService {
     private let functions = Functions.functions()
     private let db = Firestore.firestore()
 
-    func generatePlan(userId: String, skillLevel: Double, focusAreas: [String]) async throws -> PracticePlan {
+    func generatePlan(userId: String, skillLevel: Double, focusAreas: [String], availableMinutes: Int = 45, goals: String = "General Improvement") async throws -> PracticePlan {
         let callable = functions.httpsCallable("generatePracticePlan")
 
         let payload: [String: Any] = [
             "userId": userId,
             "skillLevel": skillLevel,
             "focusAreas": focusAreas,
+            "availableMinutes": availableMinutes,
+            "goals": goals,
         ]
 
         let result = try await callable.call(payload)
