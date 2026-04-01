@@ -1,0 +1,28 @@
+# Dependencies
+node_modules/
+functions/node_modules/
+functions/lib/
+
+# Build
+build/
+DerivedData/
+
+# Xcode
+*.xcuserdata
+xcuserdata/
+*.xcworkspace/xcuserdata/
+
+# Firebase
+.firebase/
+firebase-debug.log
+ui-debug.log
+
+# OMC
+.omc/
+
+# Environment
+.env
+.env.local
+
+# OS
+.DS_Store
