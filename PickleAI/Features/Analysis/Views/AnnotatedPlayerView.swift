@@ -256,11 +256,13 @@ private struct TipRow: View {
     AnnotatedPlayerView(
         videoUrl: "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4",
         feedback: CoachingFeedback(
-            grip: CategoryFeedback(score: 8, tips: ["Relax your grip for touch shots"], timestamp: 3.0),
-            stance: CategoryFeedback(score: 7, tips: ["Widen your base slightly"], timestamp: 7.0),
-            swingPath: CategoryFeedback(score: 6, tips: ["Follow through to target"], timestamp: 12.0),
-            followThrough: CategoryFeedback(score: 9, tips: ["Great extension!"], timestamp: 17.0),
-            footwork: CategoryFeedback(score: 5, tips: ["Move feet earlier", "Stay on toes"], timestamp: 22.0),
+            categories: [
+                "grip": CategoryFeedback(score: 8, tips: ["Relax your grip for touch shots"], timestamp: 3.0),
+                "stance": CategoryFeedback(score: 7, tips: ["Widen your base slightly"], timestamp: 7.0),
+                "swingPath": CategoryFeedback(score: 6, tips: ["Follow through to target"], timestamp: 12.0),
+                "followThrough": CategoryFeedback(score: 9, tips: ["Great extension!"], timestamp: 17.0),
+                "footwork": CategoryFeedback(score: 5, tips: ["Move feet earlier", "Stay on toes"], timestamp: 22.0),
+            ],
             generalTips: ["Patient dink rallies win points"]
         )
     )

@@ -11,6 +11,7 @@ struct SwingAnalysis: Codable, Identifiable {
     var overallScore: Int?
     var feedback: CoachingFeedback?
     var isPickleball: Bool
+    var shotType: ShotType?
     var errorMessage: String?
 
     enum AnalysisStatus: String, Codable {

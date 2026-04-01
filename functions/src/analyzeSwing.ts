@@ -2,6 +2,7 @@ import * as functions from "firebase-functions/v2/https";
 import * as admin from "firebase-admin";
 import OpenAI from "openai";
 import { MAX_DAILY_ANALYSES, MODEL, MAX_FRAMES } from "./config";
+import { getPromptForShotType } from "./prompts";
 
 function getOpenAI(): OpenAI {
   return new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
@@ -11,6 +12,7 @@ interface AnalyzeSwingRequest {
   frames: string[];
   userId: string;
   videoDuration: number;
+  shotType?: string;
 }
 
 interface CategoryFeedback {
@@ -22,90 +24,16 @@ interface CategoryFeedback {
 interface CoachingFeedback {
   isPickleball: boolean;
   overallScore: number;
-  grip: CategoryFeedback;
-  stance: CategoryFeedback;
-  swingPath: CategoryFeedback;
-  followThrough: CategoryFeedback;
-  footwork: CategoryFeedback;
   generalTips: string[];
+  [category: string]: unknown;
 }
-
-const feedbackSchema = {
-  type: "object",
-  properties: {
-    isPickleball: { type: "boolean" },
-    overallScore: { type: "number" },
-    grip: {
-      type: "object",
-      properties: {
-        score: { type: "number" },
-        tips: { type: "array", items: { type: "string" } },
-        timestamp: { type: "number" },
-      },
-      required: ["score", "tips", "timestamp"],
-      additionalProperties: false,
-    },
-    stance: {
-      type: "object",
-      properties: {
-        score: { type: "number" },
-        tips: { type: "array", items: { type: "string" } },
-        timestamp: { type: "number" },
-      },
-      required: ["score", "tips", "timestamp"],
-      additionalProperties: false,
-    },
-    swingPath: {
-      type: "object",
-      properties: {
-        score: { type: "number" },
-        tips: { type: "array", items: { type: "string" } },
-        timestamp: { type: "number" },
-      },
-      required: ["score", "tips", "timestamp"],
-      additionalProperties: false,
-    },
-    followThrough: {
-      type: "object",
-      properties: {
-        score: { type: "number" },
-        tips: { type: "array", items: { type: "string" } },
-        timestamp: { type: "number" },
-      },
-      required: ["score", "tips", "timestamp"],
-      additionalProperties: false,
-    },
-    footwork: {
-      type: "object",
-      properties: {
-        score: { type: "number" },
-        tips: { type: "array", items: { type: "string" } },
-        timestamp: { type: "number" },
-      },
-      required: ["score", "tips", "timestamp"],
-      additionalProperties: false,
-    },
-    generalTips: { type: "array", items: { type: "string" } },
-  },
-  required: [
-    "isPickleball",
-    "overallScore",
-    "grip",
-    "stance",
-    "swingPath",
-    "followThrough",
-    "footwork",
-    "generalTips",
-  ],
-  additionalProperties: false,
-};
 
 export const analyzeSwing = functions.onCall(
   { timeoutSeconds: 120, memory: "512MiB", secrets: ["OPENAI_API_KEY"] },
   async (request) => {
     const db = admin.firestore();
     const data = request.data as AnalyzeSwingRequest;
-    const { frames, userId, videoDuration } = data;
+    const { frames, userId, videoDuration, shotType } = data;
 
     if (!frames || !Array.isArray(frames) || frames.length === 0) {
       throw new functions.HttpsError("invalid-argument", "No frames provided");
@@ -150,6 +78,8 @@ export const analyzeSwing = functions.onCall(
         },
       }));
 
+    const { systemPrompt, schema } = getPromptForShotType(shotType ?? null);
+
     let feedback: CoachingFeedback;
     try {
       const openai = getOpenAI();
@@ -158,13 +88,7 @@ export const analyzeSwing = functions.onCall(
         messages: [
           {
             role: "system",
-            content:
-              "You are an expert pickleball coach. Analyze the player's form across the provided video frames. " +
-              "Evaluate grip, stance, swing path, follow-through, and footwork. " +
-              "First determine if the content is actually a pickleball match or practice session. " +
-              "If it is not pickleball, set isPickleball to false and provide zero scores with empty tips. " +
-              "Otherwise, provide detailed coaching feedback with scores (0-100) and actionable tips for each category. " +
-              "Set timestamp to the approximate frame number where the observation was made.",
+            content: systemPrompt,
           },
           {
             role: "user",
@@ -182,7 +106,7 @@ export const analyzeSwing = functions.onCall(
           json_schema: {
             name: "CoachingFeedback",
             strict: true,
-            schema: feedbackSchema,
+            schema: schema,
           },
         },
         max_tokens: 1500,

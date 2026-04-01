@@ -14,15 +14,19 @@ class AnalysisService {
         frames: [String],
         userId: String,
         videoUrl: String,
-        videoDuration: Double
+        videoDuration: Double,
+        shotType: String? = nil
     ) async throws -> SwingAnalysis {
         let callable = functions.httpsCallable("analyzeSwing")
 
-        let payload: [String: Any] = [
+        var payload: [String: Any] = [
             "frames": frames,
             "userId": userId,
             "videoDuration": videoDuration,
         ]
+        if let shotType = shotType {
+            payload["shotType"] = shotType
+        }
 
         let result = try await callable.call(payload)
 
@@ -43,6 +47,7 @@ class AnalysisService {
             overallScore: overallScore,
             feedback: feedback,
             isPickleball: true,
+            shotType: shotType.flatMap { ShotType(rawValue: $0) },
             errorMessage: nil
         )
 
@@ -57,31 +62,21 @@ class AnalysisService {
     // MARK: - Decoding helpers
 
     private func decodeFeedback(from data: [String: Any]) throws -> CoachingFeedback {
-        let grip = try decodeCategory(from: data, key: "grip")
-        let stance = try decodeCategory(from: data, key: "stance")
-        let swingPath = try decodeCategory(from: data, key: "swingPath")
-        let followThrough = try decodeCategory(from: data, key: "followThrough")
-        let footwork = try decodeCategory(from: data, key: "footwork")
-        let generalTips = data["generalTips"] as? [String] ?? []
+        let reservedKeys: Set<String> = ["isPickleball", "overallScore", "generalTips"]
+        var categories: [String: CategoryFeedback] = [:]
 
-        return CoachingFeedback(
-            grip: grip,
-            stance: stance,
-            swingPath: swingPath,
-            followThrough: followThrough,
-            footwork: footwork,
-            generalTips: generalTips
-        )
-    }
-
-    private func decodeCategory(from data: [String: Any], key: String) throws -> CategoryFeedback {
-        guard let categoryData = data[key] as? [String: Any] else {
-            throw AnalysisError.missingField(key)
+        for (key, _) in data {
+            guard !reservedKeys.contains(key) else { continue }
+            if let categoryData = data[key] as? [String: Any] {
+                let score = categoryData["score"] as? Int ?? 0
+                let tips = categoryData["tips"] as? [String] ?? []
+                let timestamp = categoryData["timestamp"] as? Double ?? 0
+                categories[key] = CategoryFeedback(score: score, tips: tips, timestamp: timestamp)
+            }
         }
-        let score = categoryData["score"] as? Int ?? 0
-        let tips = categoryData["tips"] as? [String] ?? []
-        let timestamp = categoryData["timestamp"] as? Double ?? 0
-        return CategoryFeedback(score: score, tips: tips, timestamp: timestamp)
+
+        let generalTips = data["generalTips"] as? [String] ?? []
+        return CoachingFeedback(categories: categories, generalTips: generalTips)
     }
 }
 

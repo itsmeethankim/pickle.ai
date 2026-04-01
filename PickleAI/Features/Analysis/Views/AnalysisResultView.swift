@@ -237,11 +237,13 @@ private struct SectionLabel: View {
             status: .completed,
             overallScore: 7,
             feedback: CoachingFeedback(
-                grip: CategoryFeedback(score: 8, tips: ["Maintain a loose grip"], timestamp: 2.5),
-                stance: CategoryFeedback(score: 6, tips: ["Widen your base"], timestamp: 5.0),
-                swingPath: CategoryFeedback(score: 7, tips: ["Follow through toward target"], timestamp: 8.0),
-                followThrough: CategoryFeedback(score: 9, tips: ["Great extension!"], timestamp: 11.0),
-                footwork: CategoryFeedback(score: 5, tips: ["Move feet earlier", "Stay on toes"], timestamp: 14.0),
+                categories: [
+                    "grip": CategoryFeedback(score: 8, tips: ["Maintain a loose grip"], timestamp: 2.5),
+                    "stance": CategoryFeedback(score: 6, tips: ["Widen your base"], timestamp: 5.0),
+                    "swingPath": CategoryFeedback(score: 7, tips: ["Follow through toward target"], timestamp: 8.0),
+                    "followThrough": CategoryFeedback(score: 9, tips: ["Great extension!"], timestamp: 11.0),
+                    "footwork": CategoryFeedback(score: 5, tips: ["Move feet earlier", "Stay on toes"], timestamp: 14.0),
+                ],
                 generalTips: ["Stay patient during dink rallies", "Work on your third-shot drop"]
             ),
             isPickleball: true,

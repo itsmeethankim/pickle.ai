@@ -1,5 +1,6 @@
 import SwiftUI
 import UIKit
+import FirebaseFirestore
 
 struct ContentView: View {
     @EnvironmentObject var authViewModel: AuthViewModel
@@ -26,6 +27,16 @@ struct MainTabView: View {
                     Label("Record", systemImage: "video.fill")
                 }
 
+            CoachTab()
+                .tabItem {
+                    Label("Coach", systemImage: "bubble.left.and.text.bubble.right.fill")
+                }
+
+            PracticeTab()
+                .tabItem {
+                    Label("Practice", systemImage: "figure.run")
+                }
+
             HistoryTab()
                 .tabItem {
                     Label("History", systemImage: "clock.fill")
@@ -45,6 +56,10 @@ struct RecordTab: View {
     @StateObject private var analysisVM = AnalysisViewModel()
     @EnvironmentObject var authViewModel: AuthViewModel
     @State private var analysisStartTime = Date()
+    @State private var selectedShotType: ShotType?
+    @State private var isShowingShotPicker = false
+    @State private var shotPickerSelection: ShotType = .general
+    @State private var pendingCameraCapture = false
 
     var body: some View {
         NavigationStack {
@@ -67,7 +82,8 @@ struct RecordTab: View {
                 VStack(spacing: 12) {
                     if UIImagePickerController.isSourceTypeAvailable(.camera) {
                         Button {
-                            captureVM.isShowingCamera = true
+                            pendingCameraCapture = true
+                            isShowingShotPicker = true
                         } label: {
                             Label("Record Video", systemImage: "camera.fill")
                                 .frame(maxWidth: .infinity)
@@ -77,7 +93,8 @@ struct RecordTab: View {
                     }
 
                     Button {
-                        captureVM.isShowingPicker = true
+                        pendingCameraCapture = false
+                        isShowingShotPicker = true
                     } label: {
                         Label("Choose from Library", systemImage: "photo.on.rectangle")
                             .frame(maxWidth: .infinity)
@@ -90,6 +107,33 @@ struct RecordTab: View {
                 Spacer()
             }
             .navigationTitle("PickleAI")
+            .sheet(isPresented: $isShowingShotPicker, onDismiss: {
+                if pendingCameraCapture {
+                    captureVM.isShowingCamera = true
+                } else {
+                    captureVM.isShowingPicker = true
+                }
+            }) {
+                NavigationStack {
+                    ScrollView {
+                        ShotTypePickerView(selectedShotType: $shotPickerSelection) {
+                            selectedShotType = shotPickerSelection
+                            isShowingShotPicker = false
+                        }
+                        .padding()
+                    }
+                    .navigationTitle("Select Shot Type")
+                    .navigationBarTitleDisplayMode(.inline)
+                    .toolbar {
+                        ToolbarItem(placement: .topBarLeading) {
+                            Button("Skip") {
+                                selectedShotType = nil
+                                isShowingShotPicker = false
+                            }
+                        }
+                    }
+                }
+            }
             .sheet(isPresented: $captureVM.isShowingCamera) {
                 CameraView(
                     onVideoRecorded: { url in
@@ -184,8 +228,20 @@ struct RecordTab: View {
               let userId = authViewModel.currentUser?.uid else { return }
         analysisStartTime = Date()
         Task {
-            await analysisVM.analyzeVideo(url: url, userId: userId)
+            await analysisVM.analyzeVideo(url: url, userId: userId, shotType: selectedShotType)
         }
+    }
+}
+
+struct CoachTab: View {
+    var body: some View {
+        ConversationListView()
+    }
+}
+
+struct PracticeTab: View {
+    var body: some View {
+        PracticeTabView()
     }
 }
 
@@ -199,6 +255,7 @@ struct HistoryTab: View {
 
 struct ProfileTab: View {
     @EnvironmentObject var authViewModel: AuthViewModel
+    @State private var skillLevel: Double = 3.0
 
     var body: some View {
         NavigationStack {
@@ -219,6 +276,20 @@ struct ProfileTab: View {
                     .padding(.vertical, 4)
                 }
 
+                Section("Skill Level") {
+                    HStack {
+                        Slider(value: $skillLevel, in: 2.0...5.0, step: 0.5)
+                            .tint(.green)
+                            .onChange(of: skillLevel) { _, newValue in
+                                saveSkillLevel(newValue)
+                            }
+                        Text(skillLevel, format: .number.precision(.fractionLength(1)))
+                            .font(.subheadline.bold())
+                            .foregroundStyle(.green)
+                            .frame(width: 36, alignment: .trailing)
+                    }
+                }
+
                 Section {
                     Button("Sign Out", role: .destructive) {
                         authViewModel.signOut()
@@ -226,6 +297,22 @@ struct ProfileTab: View {
                 }
             }
             .navigationTitle("Profile")
+            .onAppear { loadSkillLevel() }
+        }
+    }
+
+    private func saveSkillLevel(_ value: Double) {
+        guard let userId = authViewModel.currentUser?.uid else { return }
+        Firestore.firestore().collection("users").document(userId)
+            .setData(["skillLevel": value], merge: true)
+    }
+
+    private func loadSkillLevel() {
+        guard let userId = authViewModel.currentUser?.uid else { return }
+        Firestore.firestore().collection("users").document(userId).getDocument { snapshot, _ in
+            if let value = snapshot?.data()?["skillLevel"] as? Double {
+                skillLevel = value
+            }
         }
     }
 }

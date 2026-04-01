@@ -41,7 +41,7 @@ final class AnalysisViewModel: ObservableObject {
 
     // MARK: - Main flow
 
-    func analyzeVideo(url: URL, userId: String) async {
+    func analyzeVideo(url: URL, userId: String, shotType: ShotType? = nil) async {
         analysisState = .extractingFrames(progress: 0)
 
         // Step 1: Extract frames
@@ -101,7 +101,8 @@ final class AnalysisViewModel: ObservableObject {
                 frames: base64Frames,
                 userId: userId,
                 videoUrl: storageUrl,
-                videoDuration: duration
+                videoDuration: duration,
+                shotType: shotType?.rawValue
             )
             guard result.isPickleball else {
                 analysisState = .failed(AnalysisError.notPickleball)
